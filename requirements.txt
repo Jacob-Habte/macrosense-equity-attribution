@@ -1,0 +1,12 @@
+pandas
+numpy
+yfinance
+fredapi
+matplotlib
+plotly
+statsmodels
+scikit-learn
+streamlit
+python-dotenv
+jupyter
+ipykernel
