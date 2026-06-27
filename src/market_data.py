@@ -1,6 +1,31 @@
 import pandas as pd # Pandas handles tables
 import yfinance as yf # yf pulls market data
 
+# Sector EFT Map
+# Tells the model which sector ETF should be used as the compaison benchmark for each stock
+SECTOR_ETF_MAP = {
+    "AAPL": "XLK",
+    "MSFT": "XLK",
+    "FICO": "XLK",
+    "JPM": "XLF",
+    "XOM": "XLE"
+}
+
+# Benchmark ETF's used in MVP, SPY and QQQ for broad market movement, XL for sector level movement
+BENCHMARK_TICKERS = [
+    "SPY",
+    "QQQ",
+    "XLK",
+    "XLF",
+    "XLE",
+    "XLY",
+    "XLI",
+    "XLV",
+    "XLP",
+    "XLU",
+    "XLRE"
+]
+
 """
 1. Pull stock price data from yfinance
 2. Check if the ticker actually returned data
@@ -113,8 +138,54 @@ def calculate_returns(price_df, frequency="weekly"):
 
     return returns
 
+"""
+1. Starts with an empty benchmark table
+2. Loops through each ETF ticker
+3. Pulls that ETF’s prices
+4. Converts those prices into returns
+5. Merges each ETF return column into one table by date
+"""
 
+def get_benchmark_returns(start_date, end_date, frequency="weekly"):
+    """
+    Pull benchmark ETF prices and convert them into returns.
 
+    Prm's:
+        start_date: start date, 'YYYY-MM-DD' form
+        end_date: end date, 'YYYY-MM-DD' form
+        frequency: Return frequency, default is weekly as MacroSense should use weekly returns mainly
+    Returns:
+        A pandas DataFrame where each row is a date and each column is an ETF return
+    """
 
+    benchmark_returns = None
 
+    # For a ticker in our benchmark tickers, grab its prices and returns via previous functions, merge a etf returns with the returns table and rename the column to be {the ticker}_returns
+    for ticker in BENCHMARK_TICKERS:
+        prices = get_stock_prices(ticker, start_date, end_date)
+        returns = calculate_returns(prices, frequency=frequency)
 
+        returns = returns[["date", "return"]].rename(columns={"return": f"{ticker.lower()}_return"})
+
+        if benchmark_returns is None:
+            benchmark_returns = returns
+        
+        else:
+            benchmark_returns = benchmark_returns.merge(returns, on="date", how="inner")
+
+    return benchmark_returns
+
+def get_sector_etf(ticker):
+    """
+    Return the sector ETF for a given stock ticker.
+
+    Example:
+        get_sector_etf("JPM") returns "XLF"
+    """
+
+    ticker = ticker.upper()
+
+    if ticker not in SECTOR_ETF_MAP:
+        raise ValueError(f"No sector ETF mapping found for ticker: {ticker}")
+
+    return SECTOR_ETF_MAP[ticker]
