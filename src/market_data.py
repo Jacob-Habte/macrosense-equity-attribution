@@ -85,7 +85,12 @@ def get_stock_prices(ticker, start_date, end_date):
     # Return only the clean/required columns in the order we want.
     data = data[required_columns]
 
+    data = data[required_columns]
+
+    data.columns.name = None
+
     return data
+
 
 def calculate_returns(price_df, frequency="weekly"):
     """
