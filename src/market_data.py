@@ -1,17 +1,33 @@
 import pandas as pd # Pandas handles tables
 import yfinance as yf # yf pulls market data
 
-# Sector EFT Map
-# Tells the model which sector ETF should be used as the compaison benchmark for each stock
-SECTOR_ETF_MAP = {
+SECTOR_TO_ETF = {
+    "technology": "XLK",
+    "financial services": "XLF",
+    "financials": "XLF",
+    "energy": "XLE",
+    "consumer cyclical": "XLY",
+    "consumer discretionary": "XLY",
+    "industrials": "XLI",
+    "healthcare": "XLV",
+    "health care": "XLV",
+    "consumer defensive": "XLP",
+    "consumer staples": "XLP",
+    "utilities": "XLU",
+    "real estate": "XLRE",
+    "communication services": "XLC",
+    "basic materials": "XLB",
+    "materials": "XLB"
+}
+
+FALLBACK_TICKER_TO_ETF = {
+    "FICO": "XLK",
     "AAPL": "XLK",
     "MSFT": "XLK",
-    "FICO": "XLK",
     "JPM": "XLF",
     "XOM": "XLE"
 }
 
-# Benchmark ETF's used in MVP, SPY and QQQ for broad market movement, XL for sector level movement
 BENCHMARK_TICKERS = [
     "SPY",
     "QQQ",
@@ -23,8 +39,89 @@ BENCHMARK_TICKERS = [
     "XLV",
     "XLP",
     "XLU",
-    "XLRE"
+    "XLRE",
+    "XLC",
+    "XLB"
 ]
+
+
+def clean_sector_name(sector_name):
+    """
+    Standardize sector text so it can be matched to SECTOR_TO_ETF.
+    """
+
+    if sector_name is None:
+        return None
+
+    return str(sector_name).strip().lower()
+
+
+def get_ticker_profile(ticker):
+    """
+    Pull basic company metadata from yfinance.
+
+    Returns:
+        A dictionary with ticker, company name, sector, industry, quote type, and currency.
+    """
+
+    ticker = ticker.upper()
+
+    yf_ticker = yf.Ticker(ticker)
+
+    try:
+        info = yf_ticker.info
+    except Exception:
+        info = {}
+
+    # Try multiple possible name fields.
+    # yfinance does not always return longName for every ticker.
+    company_name = (
+        info.get("longName")
+        or info.get("shortName")
+        or info.get("displayName")
+        or info.get("name")
+        or ticker
+    )
+
+    profile = {
+        "ticker": ticker,
+        "long_name": company_name,
+        "sector": info.get("sector"),
+        "industry": info.get("industry"),
+        "quote_type": info.get("quoteType"),
+        "currency": info.get("currency")
+    }
+
+    return profile
+
+def get_sector_etf(ticker, fallback_to_market=True):
+    """
+    Return the best sector ETF for a ticker.
+
+    First, use manual fallbacks for known MVP tickers.
+    Then, try to pull the sector from yfinance.
+    If no sector match is found, optionally fall back to SPY.
+    """
+
+    ticker = ticker.upper()
+
+    if ticker in FALLBACK_TICKER_TO_ETF:
+        return FALLBACK_TICKER_TO_ETF[ticker]
+
+    profile = get_ticker_profile(ticker)
+
+    sector = clean_sector_name(profile.get("sector"))
+
+    if sector in SECTOR_TO_ETF:
+        return SECTOR_TO_ETF[sector]
+
+    if fallback_to_market:
+        return "SPY"
+
+    raise ValueError(
+        f"No sector ETF mapping found for ticker: {ticker}. "
+        f"Detected sector: {profile.get('sector')}"
+    )
 
 """
 1. Pull stock price data from yfinance
@@ -85,8 +182,6 @@ def get_stock_prices(ticker, start_date, end_date):
     # Return only the clean/required columns in the order we want.
     data = data[required_columns]
 
-    data = data[required_columns]
-
     data.columns.name = None
 
     return data
@@ -100,46 +195,56 @@ def calculate_returns(price_df, frequency="weekly"):
         price_df:
             Pandas DataFrame from get_stock_prices()
         frequency:
-            Return frequence wanted
-            Options:
-                "daily", "weekly, "monthly"
+            Return frequency wanted.
+            Options: "daily", "weekly", "monthly"
                  
     Return:
-        Pandas DrataFrame with date, adjusted_close, return
-          
+        Pandas DataFrame with date, adjusted_close, return
     """
 
-    # Make a copy of table, make sure data column treated as datetime column, sort data from oldest to newest, extract columns needed for return calculation, and set the date as the index
+    # Make a copy of the table.
     data = price_df.copy()
-    data["data"] = pd.to_datetime(data["date"])
-    data.sort_values("date")
-    date = data[["date", "adjusted_close"]]
+
+    # Make sure date is treated as a datetime column.
+    data["date"] = pd.to_datetime(data["date"])
+
+    # Sort data from oldest to newest.
+    data = data.sort_values("date")
+
+    # Keep only the columns needed for return calculation.
+    data = data[["date", "adjusted_close"]]
+
+    # Set date as the index so we can resample by time.
     data = data.set_index("date")
 
-    # Based on the chosen frequency, convert adjusted close prices into daily, weekly, or monthly returns by comparing each period's ending price to the previous period's ending price.
-    # Provide options for less frequent as daily data can be to loud
+    # Based on the chosen frequency, convert adjusted close prices into returns.
     if frequency == "daily":
         returns = data.copy()
         returns["return"] = returns["adjusted_close"].pct_change()
+
     elif frequency == "weekly":
         weekly_prices = data.resample("W-FRI").last()
         returns = weekly_prices.copy()
         returns["return"] = returns["adjusted_close"].pct_change()
+
     elif frequency == "monthly":
         monthly_prices = data.resample("ME").last()
         returns = monthly_prices.copy()
         returns["return"] = returns["adjusted_close"].pct_change()
+
     else:
-        raise ValueError("frequency must be 'daily', 'weekly', 'monthly'")
+        raise ValueError("frequency must be 'daily', 'weekly', or 'monthly'")
     
-    #First return will be absent of data due to having nothing to compare to, dropna removes N/A returns
+    # The first return is missing because there is no previous period to compare to.
     returns = returns.dropna()
 
-    #Move date backf the index into a normal column
+    # Move date from index back into a normal column.
     returns = returns.reset_index()
 
-    #Keep only the clean final columns
+    # Keep only the clean final columns.
     returns = returns[["date", "adjusted_close", "return"]]
+
+    returns.columns.name = None
 
     return returns
 
@@ -179,18 +284,3 @@ def get_benchmark_returns(start_date, end_date, frequency="weekly"):
             benchmark_returns = benchmark_returns.merge(returns, on="date", how="inner")
 
     return benchmark_returns
-
-def get_sector_etf(ticker):
-    """
-    Return the sector ETF for a given stock ticker.
-
-    Example:
-        get_sector_etf("JPM") returns "XLF"
-    """
-
-    ticker = ticker.upper()
-
-    if ticker not in SECTOR_ETF_MAP:
-        raise ValueError(f"No sector ETF mapping found for ticker: {ticker}")
-
-    return SECTOR_ETF_MAP[ticker]

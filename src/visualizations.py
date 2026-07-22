@@ -1,5 +1,6 @@
+import pandas as pd
 import plotly.express as px
-
+import plotly.graph_objects as go
 
 def plot_actual_vs_predicted(attribution_table):
     """
@@ -22,7 +23,6 @@ def plot_actual_vs_predicted(attribution_table):
 
     return fig
 
-
 def plot_residuals_over_time(attribution_table):
     """
     Plot residual returns over time.
@@ -42,7 +42,6 @@ def plot_residuals_over_time(attribution_table):
     )
 
     return fig
-
 
 def plot_contribution_breakdown(attribution_table, row_index=-1):
     """
@@ -72,7 +71,10 @@ def plot_contribution_breakdown(attribution_table, row_index=-1):
         }
     )
 
+    
+
     return fig
+
 
 
 def plot_largest_residuals(largest_residuals):
@@ -95,7 +97,6 @@ def plot_largest_residuals(largest_residuals):
 
     return fig
 
-
 def plot_coefficients(coefficient_table):
     """
     Plot regression coefficients.
@@ -115,6 +116,129 @@ def plot_coefficients(coefficient_table):
         labels={
             "coefficient": "Coefficient",
             "feature": "Feature"
+        }
+    )
+
+    return fig
+
+def plot_return_contribution_waterfall(attribution_table, row_index=-1):
+    """
+    Create a waterfall chart showing how market, sector, macro,
+    and residual contributions add up to actual return.
+    """
+
+    row = attribution_table.iloc[row_index]
+
+    fig = go.Figure(
+        go.Waterfall(
+            name="Return Attribution",
+            orientation="v",
+            measure=[
+                "relative",
+                "relative",
+                "relative",
+                "relative",
+                "total"
+            ],
+            x=[
+                "Market",
+                "Sector",
+                "Macro",
+                "Residual",
+                "Actual Return"
+            ],
+            y=[
+                row["market_contribution"],
+                row["sector_contribution"],
+                row["macro_contribution"],
+                row["residual_return"],
+                row["actual_return"]
+            ],
+            connector={"line": {"width": 1}}
+        )
+    )
+
+    fig.update_layout(
+        title="Return Attribution Waterfall",
+        yaxis_title="Return Contribution",
+        showlegend=False
+    )
+
+    return fig
+
+def plot_macro_contributions(attribution_table, row_index=-1):
+    """
+    Plot individual macro contributions for a selected week.
+    """
+
+    row = attribution_table.iloc[row_index]
+
+    macro_contribution_columns = [
+        column for column in attribution_table.columns
+        if column.endswith("_contribution")
+        and column not in [
+            "constant_contribution",
+            "market_contribution",
+            "sector_contribution",
+            "macro_contribution",
+            "total_explained_contribution"
+        ]
+    ]
+
+    macro_data = []
+
+    for column in macro_contribution_columns:
+        macro_data.append(
+            {
+                "macro_factor": column.replace("_contribution", ""),
+                "contribution": row[column]
+            }
+        )
+
+    macro_df = pd.DataFrame(macro_data)
+
+    macro_df = macro_df.sort_values(
+        "contribution",
+        key=lambda column: column.abs(),
+        ascending=False
+    )
+
+    fig = px.bar(
+        macro_df,
+        x="contribution",
+        y="macro_factor",
+        orientation="h",
+        title="Individual Macro Contributions",
+        labels={
+            "contribution": "Return Contribution",
+            "macro_factor": "Macro Factor"
+        }
+    )
+
+    return fig
+
+def plot_cumulative_actual_vs_predicted(attribution_table):
+    """
+    Plot cumulative actual and predicted returns over time.
+    """
+
+    data = attribution_table.copy()
+
+    data["cumulative_actual_return"] = (1 + data["actual_return"]).cumprod() - 1
+    data["cumulative_predicted_return"] = (1 + data["predicted_return"]).cumprod() - 1
+
+    fig = px.line(
+        data,
+        x="date",
+        y=[
+            "cumulative_actual_return",
+            "cumulative_predicted_return"
+        ],
+        title="Cumulative Actual vs Predicted Returns",
+        labels={
+            "date": "Date",
+            "value": "Cumulative Return",
+            "variable": "Return Type"
         }
     )
 

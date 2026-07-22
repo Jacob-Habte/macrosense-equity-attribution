@@ -1,32 +1,44 @@
-# MacroSense: Ticker-Agnostic Equity Movement Attribution Engine
+# MacroSense: Equity Movement Attribution Engine
 
-MacroSense is a Python-based investment analysis project designed to help explain whether a stock’s recent movement was primarily driven by broad market trends, sector performance, macroeconomic conditions, or unexplained company-specific factors. The goal is to create a ticker-agnostic framework where a user can input a stock ticker and evaluate how much of the movement appears connected to market, sector, and macro drivers versus residual company-specific movement.
+MacroSense is a Python-based equity movement attribution tool. It estimates whether a stock's weekly return was more closely linked to broad market returns, sector returns, macroeconomic shocks, or unexplained residual movement.
 
-## MVP Features
+## Project Purpose
 
-The minimum viable product will include:
+The goal is to combine market data, macroeconomic indicators, and regression analysis into a simple attribution framework.
 
-- Ticker input
-- Stock data collection
-- Macro data collection
-- Sector mapping
-- Weekly return calculation
-- Regression-based attribution model
-- Residual signal
-- Streamlit dashboard
+The model does not prove causation and should not be treated as investment advice. It is a historical analysis tool designed to make stock movement explanations more structured and data-driven.
 
-## Initial Test Tickers
+## Current Features
 
-The first sample tickers I plan to test later are:
+- Pulls stock price data using yfinance.
+- Calculates daily, weekly, and monthly stock returns.
+- Pulls market and sector ETF benchmark returns.
+- Pulls macroeconomic data from FRED.
+- Aligns stock, benchmark, sector, and macro data onto a weekly timeline.
+- Creates macro change features.
+- Standardizes macro shocks using z-scores.
+- Runs correlation analysis.
+- Runs OLS regression analysis.
+- Creates attribution tables with actual return, predicted return, factor contributions, and residual return.
+- Produces plain-English MVP summaries.
+- Includes a Streamlit dashboard.
 
-- FICO — software/data/credit scoring exposure
-- JPM — financials, interest rates, credit, and yield curve exposure
-- XOM — energy, oil prices, inflation, and commodity cycle exposure
+## MVP Tickers
 
-## Project Scope
+The current MVP supports manual sector mapping for:
 
-This project focuses on explaining historical stock movement, not forecasting future stock prices. The model will estimate whether a stock’s return appears more connected to broad market performance, sector performance, macroeconomic changes, or unexplained residual movement. In the end, this model is focused on attribution NOT prediction.
+- FICO → XLK
+- AAPL → XLK
+- MSFT → XLK
+- JPM → XLF
+- XOM → XLE
 
-The first version will prioritize interpretability over complexity. 
+## Project Structure
 
-Goal is to create a clear and explainable investment analysis tool that can be discussed, and expanded over time.
+```text
+app/              Streamlit dashboard
+src/              Python source code
+notebooks/        Testing notebook
+docs/             Project notes and summaries
+data/             Local data outputs
+outputs/          Local dashboard/model outputs

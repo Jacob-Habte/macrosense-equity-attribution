@@ -5,3 +5,5 @@ __pycache__/
 data/*.csv
 outputs/*.csv
 outputs/*.xlsx
+outputs/*.txt
+outputs/**/*.txt
